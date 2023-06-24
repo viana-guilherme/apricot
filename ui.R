@@ -10,26 +10,39 @@
 library(shiny)
 
 # Define UI for the application
-shinyUI(navbarPage("apricot",
+shinyUI(
+  navbarPage("apricot",
 
     # landing page
     tabPanel("Welcome!",
-              h2("Apricot is a tool for automated proteomics differential expression analysis and ontology testing")
-             ),
+             # enabling styling via the external css
+             tags$head(
+               tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")),
+
+             #content
+             tags$div(class = "mainpage-content",
+             tags$p(class = "text-highlight", "Welcome to apricot!"),
+             tags$ul(
+             tags$li("Apricot is a web-based tool for performing differential expression analysis and gene ontology enrichment tests
+                    on DIA-NN-generated proteomics datasets"),
+             tags$li("To get started, you can read our documentation or head to the 'run analysis' tab to upload and process your dataset"),
+             tags$li("To know more about this project and the methodology employed, please check out the 'References' section"),
+             tags$li("Please, direct any comment or suggestion to viana.guilherme@lbl.gov")
+             ))),
 
     # main functionalities page
     tabPanel("Run analysis",
       # first screen
       tabPanel("Upload a dataset",
                 fileInput(inputId = "upload",
-                          label = "Please, upload a file DIA-NN output file",
+                          label = "Please, upload a DIA-NN output file. You can click the buttom or drag files to the form below",
                           buttonLabel = "Select file..."),
                textOutput("text1"),
                textOutput("text2")
                ),
 
       # second screen
-      tabPanel("Run analysis!",
+      tabPanel("",
                sidebarLayout(
                  sidebarPanel(
                    helpText("Please select two samples to perform a comparative analysis", br(),

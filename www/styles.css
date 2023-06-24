@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Belanosima&family=Poppins:wght@100;200;300;400&display=swap');
+
+body {
+  background: #fffbeb;
+}
+
+/* NAVBAR */
+
+.navbar-default {
+  display: flex;
+  background-color: #fcd34d;
+  max-width: auto;
+  border-radius: 100px;
+  margin: 5px 25px;
+}
+
+.navbar-brand {
+  display: none;
+}
+
+/* MAIN PAGE */
+
+.mainpage-content .text-highlight {
+
+  padding: 0px 16px !important;
+  font-size: 64px !important;
+  padding-bottom: 48px;
+  padding-top: 150px;
+  color: #fbbf24;
+  font-weight: 600;
+  font-family: 'Belanosima', Sans-Serif !important;
+}
+
+.mainpage-content {
+
+  color: black;
+
+  height: 650px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.mainpage-content ul {
+  list-style-type: none;
+  margin-right: 250px;
+  margin-left: 250px;
+  margin-top: 60px;
+}
+
+.mainpage-content li {
+
+  font-size: 20px !important;
+  text-align: justify;
+  padding: 0 !important;
+  margin-bottom: 30px !important;
+  font-weight: 300;
+  font-family: 'Poppins', Sans-Serif !important;
+
+
+}
+
+/* ANALYSIS PAGE */
+
+.tab-content > .tab-pane .active {
+  background-color: #fafaf9 !important;
+}
