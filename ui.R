@@ -21,6 +21,7 @@ shinyUI(
 
              #content
              tags$div(class = "mainpage-content",
+             img(class = "img-logo", src = "logo.png", align = "center", height = 150),
              tags$p(class = "text-highlight", "Welcome to apricot!"),
              tags$ul(
              tags$li("Apricot is a web-based tool for performing differential expression analysis and gene ontology enrichment tests
@@ -63,8 +64,6 @@ shinyUI(
                                 label = "run analysis!"),
                    br(),
                    br(),
-                   conditionalPanel(
-                   condition = "input.analysis == true",
                    sliderInput("pvalue",
                                "Customize the adjusted p-value significant threshold",
                                min = 0,
@@ -78,26 +77,25 @@ shinyUI(
                                step = 0.1,
                                value = c(-1, 1)
                                )
-                 )),
+                 ),
 
                  # Show a plot of the generated distribution
                  mainPanel(
                    tabsetPanel(type = "tabs",
                                tabPanel("Volcano plot", plotly::plotlyOutput("volcano")),
-                               tabPanel("Gene ontology"),
-                               tabPanel("Results table", DT::dataTableOutput("table")))
+                               tabPanel("Gene ontology", plotOutput("ontologyplot")),
+                               tabPanel("Results table", DT::dataTableOutput("table"))),
+                   tabPanel("Download options",
+                            h4("Data download options"),
+                            fluidRow(
+                              column(width = 4, downloadButton("dl.full", label = "Download full T-test table")),
+                              column(width = 4, downloadButton("dl.up", label = "Download T-test significant UP only")),
+                              column(width = 4, downloadButton("dl.down", label = "Download T-test significant DOWN only"))
+                            )
+                   )),
                  )
                )),
 
-      # third screen
-      tabPanel("Download options",
-               h4("Download options"),
-               fluidRow(
-                column(width = 4, downloadButton("dl.full", label = "Download full table")),
-                column(width = 4, downloadButton("dl.up", label = "Download significant UP only")),
-                column(width = 4, downloadButton("dl.down", label = "Download significant DOWN only"))
-               )
-              )),
 
     # "about us" screen
     tabPanel("References")

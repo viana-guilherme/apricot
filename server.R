@@ -1,12 +1,3 @@
-#
-# This is the server logic of a Shiny web application. You can run the
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
 library(tidyverse)
 source("utils.R")
@@ -25,7 +16,7 @@ shinyServer(function(input, output, session) {
 
     # get sample names
     sampleOptions <- reactive({
-      unique(data()$Samples)
+      base::unique(data()$Samples)
     })
 
     # render info about samples on main page
@@ -46,7 +37,7 @@ shinyServer(function(input, output, session) {
 
     observe({
       updateSelectInput(session, "group2",
-                        choices = setdiff(sampleOptions(), input$group1)
+                        choices = base::setdiff(sampleOptions(), input$group1)
       )})
 
     # run analysis after button is pressed
@@ -57,7 +48,7 @@ shinyServer(function(input, output, session) {
 
     # let user know that analysis is running
     observeEvent(input$analysis, {
-      showNotification("Running T-test for the selected data! (Please wait a few seconds)", duration = 60, type = "message")
+      showNotification("Running T-test for the selected data! (Please wait a few seconds and close this pop up)", duration = 60, type = "message")
     })
 
     # enable plot design
@@ -99,7 +90,39 @@ shinyServer(function(input, output, session) {
       plotly::ggplotly(volcanoplot(), tooltip = c("x", "y", "angle"))
     })
 
-    # prepare the current visualized table for download
+    # Gene ontology part
+
+    # Running the gene ontology enrichment test based on the selected dataset
+
+    resultsGO <- reactive({
+      runEnrichment(dataset = toSave(), significance_threshold = input$pvalue)
+      })
+
+    goplot <- reactive({
+      resultsGO() |>
+        dplyr::filter(Fisher < input$pvalue) |>
+        dplyr::mutate(Term = Term |> forcats::fct_relevel(Term)) |>
+        dplyr::arrange(GO.Domain, Fisher) |>
+        dplyr::mutate(
+          plotLabels = glue::glue("{Term} ({GO.ID})"),
+          plotLabels = factor(plotLabels, levels = plotLabels)
+          ) |>
+        ggplot2::ggplot(ggplot2::aes(x = -log10(Fisher), y = rev(plotLabels), fill = GO.Domain)) +
+        ggplot2::geom_bar(stat = "identity", color = "black") +
+        ggplot2::geom_vline(xintercept = -log10(input$pvalue), linetype = "dashed", color = "gray10") +
+        ggplot2::scale_fill_discrete(type = c("#2386A7", "#00A352", "#ED8E28")) +
+        ggplot2::labs(x = "-log10(p-value)", y = "", fill = NULL) +
+        ggplot2::theme_minimal() +
+        ggplot2::theme(
+          axis.text = ggplot2::element_text(color = "black", size = 12),
+          legend.text = ggplot2::element_text(size = 14)
+        )
+    })
+
+    # Outputting the plot
+    output$ontologyplot <- renderPlot({goplot()}, res = 96)
+
+    #prepare the current visualized table for download
     toSave <- reactive({subset_plotting() |>
                           dplyr::select(-color)
               })

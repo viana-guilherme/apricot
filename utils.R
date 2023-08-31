@@ -1,7 +1,7 @@
 # reference:
 # https://www.protocols.io/view/label-free-quantification-lfq-proteomic-data-analy-5qpvobk7xl4o/v2
 
-# ------
+# ------ T-tests ---------
 import_diann <- function(file_path) {
   # Importing the report file
   db <- readr::read_csv(file = file_path) |>
@@ -29,9 +29,8 @@ import_diann <- function(file_path) {
 
   return(db)
 }
-
 find_lod <- function(x) {
-  input_sorted <- sort(unique(x))
+  input_sorted <- base::sort(base::unique(x))
   lod <- ifelse(input_sorted[1] == 0, input_sorted[2], input_sorted[1])
 
   return(lod)
@@ -114,13 +113,96 @@ run_ttest <- function(data, a, b) {
 
 }
 
-# Significantly changing proteins are defined as:
+# ------ Gene ontology ---------
 
-#    a p-value (or adjusted p-value) < 0.05
-#    a fold change of > 2 (UP) or < 0.5 (DOWN)
+runEnrichment <- function(dataset, significance_threshold) {
 
-# ----- TODO?
+  library(topGO)
+
+
+  # 1) Loading GO annotations for P. putida KT2440
+  GO_db_list <- rlist::list.load(file = "databases/GO_db_list.json") # returns the GO_db_list object from the JSON file created by createGOAnnot.R
+
+  message("read GO_db_list")
+
+  # 2) read the pre-built proteomic metadata and the user-supplied dataset table
+  metadata <- readr::read_delim(file = "databases/PutidaMetadataDB.tsv")
+  message("read metadata")
+
+  universe <- dataset
+  message("read universe")
+
+  # 3) Attach the metadata column to the universe to select info
+  db <- dplyr::left_join(universe, metadata, dplyr::join_by(Protein.Names == id))
+
+  ## We need step 3) in order to convert the protein accessions to gene loci !
+  universe_converted <- db |>
+    dplyr::select(locusTag, p.adjusted.BH) |>
+    tibble::deframe()
+
+  # 4) Defining a selection criteria for the enrichment tests (i.e. our significant genes)
+  target_genes <- function(universe_converted) universe_converted < significance_threshold
+
+  ### Building the topGO data
+
+  # ## TODO -> this section is extremely verbose. Look into ways of automating it....
+
+  GOdata_BP <- new("topGOdata",
+                   description = "Enrichment analysis - Biological process",
+                   ontology = "BP",
+                   allGenes = universe_converted,
+                   geneSel = target_genes,
+                   annot = annFUN.gene2GO,
+                   gene2GO = GO_db_list)
+
+  GOdata_CC <- new("topGOdata",
+                   description = "Enrichment analysis - Cellular component",
+                   ontology = "CC",
+                   allGenes = universe_converted,
+                   geneSel = target_genes,
+                   annot = annFUN.gene2GO,
+                   gene2GO = GO_db_list)
+
+  GOdata_MF <- new("topGOdata",
+                   description = "Enrichment analysis - Molecular Function",
+                   ontology = "MF",
+                   allGenes = universe_converted,
+                   geneSel = target_genes,
+                   annot = annFUN.gene2GO,
+                   gene2GO = GO_db_list)
+
+  test_BP <- runTest(GOdata_BP, algorithm = "weight01", statistic = "fisher")
+  test_CC <- runTest(GOdata_CC, algorithm = "weight01", statistic = "fisher")
+  test_MF <- runTest(GOdata_MF, algorithm = "weight01", statistic = "fisher")
+
+
+  results_BP <- GenTable(GOdata_BP , Fisher = test_BP) |>
+    dplyr::mutate(GO.Domain = "Biological process")
+  results_CC <- GenTable(GOdata_CC , Fisher = test_CC) |>
+    dplyr::mutate(GO.Domain = "Cellular component")
+  results_MF <- GenTable(GOdata_MF , Fisher = test_MF) |>
+    dplyr::mutate(GO.Domain = "Molecular Function")
+
+
+
+  result_table <- dplyr::bind_rows(results_BP, results_MF, results_CC) |>
+    dplyr::mutate(Fisher = as.numeric(Fisher),
+                  Annotated = as.numeric(Annotated),
+                  Significant = as.numeric(Significant),
+                  Expected = as.numeric(Expected)) |>
+    dplyr::relocate(GO.Domain)
+
+  message(print(result_table))
+
+  return(result_table)
+
+  detach("package:topGO", unload = TRUE)
+
+
+}
+
+
+# ----- TODO? ---------------
 # PCA plot calculations
-# gene ontologies
 # File sanitation
 #
