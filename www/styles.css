@@ -1,17 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Belanosima&family=Poppins:wght@100;200;300;400&display=swap');
 
+a {
+  color: #f97316;
+}
+
+a:hover {
+  color: #fdba74;
+}
+
 body {
-  background: #fffbeb;
+  background: #fffef9;
 }
 
 /* NAVBAR */
 
 .navbar-default {
   display: flex;
-  background-color: #fcd34d;
+  background-color: #fbbf24;
   max-width: auto;
   border-radius: 100px;
-  margin: 5px 25px;
+  margin: 25px;
 }
 
 .navbar-brand {
@@ -24,11 +32,16 @@ body {
 
   padding: 0px 16px !important;
   font-size: 64px !important;
-  padding-bottom: 48px;
+  padding-bottom: 32px;
   padding-top: 150px;
   color: #fbbf24;
   font-weight: 600;
   font-family: 'Belanosima', Sans-Serif !important;
+}
+
+.img-logo {
+  margin-top: 120px;
+  margin-bottom: 15px;
 }
 
 .mainpage-content {
@@ -64,6 +77,43 @@ body {
 
 /* ANALYSIS PAGE */
 
+/* INPUT FORM */
+[title="Upload a dataset"] > div.form-group.shiny-input-container {
+  padding: 10px;
+  width: auto;
+  margin-right: 300px;
+  margin-left: 450px;
+}
+
+.btn-default:hover {
+  background-color: #fb923c !important;
+  color: #f8fafc !important;
+}
+
+/* MISC ELEMENTS */
+
+/* BARS */
+.irs--shiny .irs-bar {
+  border-top: #fb923c;
+  border-bottom: #fb923c;
+  background: #fb923c;
+}
+
+.irs-single, .irs-from, .irs-to {
+  background-color: #f97316 !important;
+  color: #f8fafc !important;
+}
+
 .tab-content > .tab-pane .active {
-  background-color: #fafaf9 !important;
+  background-color: #f8fafc !important;
+}
+
+/* Notification box */
+
+#shiny-notification-panel {
+    position: fixed;
+    bottom: 50%;
+    right: 50%;
+    width: 300px;
+    height: 300px;
 }
