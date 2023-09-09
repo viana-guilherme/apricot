@@ -20,12 +20,20 @@ shinyServer(function(input, output, session) {
     })
 
     # render info about samples on main page
-    output$text1 <- renderText({
-      paste0("Found ", length(sampleOptions()), " samples in this dataset! they are:")})
 
-    output$text2 <- renderText({
-      paste0(sampleOptions())
+    initialMessage <- observeEvent(
+
+      sampleOptions(), {
+
+      optLength <- length(sampleOptions())
+      optNames <- stringr::str_flatten_comma(sampleOptions(), last = " and ")
+
+      showModal(modalDialog(
+        title = "Opening dataset file...",
+        paste0("Found ", optLength, " samples in this dataset! they are: ", optNames),
+        easyClose = TRUE))
     })
+
 
     ## second tab
 
@@ -48,8 +56,13 @@ shinyServer(function(input, output, session) {
 
     # let user know that analysis is running
     observeEvent(input$analysis, {
-      showNotification("Running T-test for the selected data! (Please wait a few seconds and close this pop up)", duration = 60, type = "message")
+      showModal(modalDialog(
+        title = "Running analysis...",
+        glue::glue("Running T-test for selected samples! (Please wait a few seconds and close this pop up. The page should refresh soon)."),
+        easyClose = TRUE
+      ))
     })
+
 
     # enable plot design
 

@@ -37,9 +37,7 @@ shinyUI(
       tabPanel("Upload a dataset",
                 fileInput(inputId = "upload",
                           label = "Please, upload a DIA-NN output file. You can click the buttom or drag files to the form below",
-                          buttonLabel = "Select file..."),
-               textOutput("text1"),
-               textOutput("text2")
+                          buttonLabel = "Select file...")
                ),
 
       # second screen
