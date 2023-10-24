@@ -68,7 +68,7 @@ find_lod <- function(x) {
 
 # ------ T-tests ---------
 
-format_ttest <- function(data, group1, group2) {
+diann_ttest <- function(data, group1, group2) {
 
   # change data so that the levels order match the user preference
   # (for determining fold-change)
@@ -116,7 +116,7 @@ format_ttest <- function(data, group1, group2) {
   #   summarise(std = sd(value_sum)) |>
   #   deframe()
 }
-run_ttest <- function(data, a, b) {
+batch_ttest <- function(data, a, b) {
   message(glue::glue("running batch Welch's T-test for sample {a} over sample {b}..."))
 
   sample_selection <- c(a, b)
@@ -134,7 +134,7 @@ run_ttest <- function(data, a, b) {
     dplyr::group_split() |>
 
     # running the t-test with our custom function
-    purrr::map_dfr(.f = format_ttest, group1 = sample_selection[1], group2 = sample_selection[2]) |>
+    purrr::map_dfr(.f = diann_ttest, group1 = sample_selection[1], group2 = sample_selection[2]) |>
     dplyr::mutate(`log2FC_A/B` = log2(2 ** log2_mean_A / 2 ** log2_mean_B))
 
     # including the BH correction considering all of the measured p-values
@@ -235,7 +235,52 @@ runEnrichment <- function(dataset, significance_threshold) {
 }
 
 
+#------ PCA -----------
+
+
+diann_pca <- function(database) {
+
+  # data needs to be wide for the clustering to work
+  pca_data <- database |>
+    dplyr::select(Protein.Names, Samples, Replicate, value_sum) |>
+    dplyr::mutate(sample_fixed = glue::glue("{Samples}_{Replicate}")) |>
+    dplyr::select(-Samples, -Replicate) |>
+    tidyr::pivot_wider(names_from = Protein.Names,
+                       values_from = value_sum) |>
+    janitor::remove_constant() # important in case there's a column with all 0's
+
+  pca_res <- pca_data |>
+    tibble::column_to_rownames(var = "sample_fixed") |>
+    prcomp(scale = TRUE)
+
+  return(pca_res)
+}
+
+diann_pca_view <- function(pca_res) {
+
+  # obtaining info on explained variance for axes labels
+  explained_variance <- pca_res$sdev ** 2 / sum(pca_res$sdev ** 2)
+
+  # plotting
+  res1$x |>
+    tibble::as_tibble(rownames = "Sample") |>
+    ggplot2::ggplot(ggplot2::aes(x = PC1, y = PC2)) +
+      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
+      ggplot2::geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.5) +
+      ggplot2::geom_point(size = 3, alpha = 0.9) +
+      ggplot2::scale_color_brewer(palette = "Set1") +
+      ggplot2::coord_fixed(1) +
+      ggplot2::labs(x = glue::glue("PC1 ({round(explained_variance[1] * 100, 2)}%)"),
+                    y = glue::glue("PC2 ({round(explained_variance[2] * 100, 2)}%)")) +
+      ggplot2::theme_light()
+
+  # todo: allow users to color using pre-defined groups as arguments
+}
+
+# ----- Top3 Calculations ---------------
+
+
+
 # ----- TODO? ---------------
-# PCA plot calculations
 # File sanitation
-#
+
