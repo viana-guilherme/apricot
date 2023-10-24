@@ -66,7 +66,7 @@ find_lod <- function(x) {
   return(lod)
 }
 
-# ------ T-tests ---------
+#------- T-tests ---------
 
 diann_ttest <- function(data, group1, group2) {
 
@@ -146,7 +146,7 @@ batch_ttest <- function(data, a, b) {
 
 }
 
-# ------ Gene ontology ---------
+#------- Gene ontology ---------
 
 runEnrichment <- function(dataset, significance_threshold) {
 
@@ -235,7 +235,7 @@ runEnrichment <- function(dataset, significance_threshold) {
 }
 
 
-#------ PCA -----------
+#------- PCA -----------
 
 
 diann_pca <- function(database) {
@@ -277,8 +277,68 @@ diann_pca_view <- function(pca_res) {
   # todo: allow users to color using pre-defined groups as arguments
 }
 
-# ----- Top3 Calculations ---------------
+#------- Top3 Calculations ---------------
 
+# top 3 method
+
+# step 1) Filter the DIA-NN peptide report data (from import) to only proteins that have three or more peptides identified across all samples
+
+# obs: the way we have the data better organized, we can it easily by using the "db" obj
+# as returned by the diann_import function
+
+# (i'm still not sure if this is the best option, but it looks elegant for now)
+find_eligible <- function(diann_database) {
+
+  eligible_ptn <- diann_database |>
+    dplyr::group_by(Protein.Names, Samples, Replicate) |> #here we use Protein.Names as an unique id
+    dplyr::tally() |>
+    dplyr::filter(n >= 3) |>
+    dplyr::arrange(desc(n))
+
+    return(eligible_ptn)
+
+}
+
+# step 2) For each protein, rank the top 3 peptides by intensity (counts) in each of the samples
+find_top3 <- function(diann_database, eligible) {
+
+  eligible_list <- unique(eligible$Protein.Names)
+
+  top3 <- diann_database |>
+    dplyr::filter(Protein.Names %in% eligible_list) |>
+    dplyr::group_by(Protein.Names, Samples, Replicate) |>
+    #dplyr::mutate(rank = rank(peptide_intensities, na.last = FALSE)) |> this is actually not doing anything
+    dplyr::slice_max(n = 3, order_by = peptide_intensities)
+
+  return(top3)
+}
+
+
+# Calculate the mean rankings of the peptides in each protein across all samples
+# obs: i follow this step, but it does not seem to be used elsewhere as of yet)
+top3_mean_ranks <- top3 |>
+  ungroup() |>
+  group_by(Protein.Names, Precursor.Id) |>
+  summarise(mean_rank = mean(rank)) |>
+  # Filter the data to the three highest ranked peptides in each protein
+  slice_max(n = 3, order_by = mean_rank)
+
+
+# Calculate protein intensity (counts) by averaging the intensity (counts) of the Top3 peptides
+
+all_intensities <- db |>
+  dplyr::group_by(Protein.Names, Samples, Replicate) |>
+  dplyr::summarise(value_sum = mean(peptide_intensities), .groups = "drop")
+
+top3_intensities <- db |>
+  filter(Precursor.Id %in% top3_mean_ranks$Precursor.Id) |>
+  group_by(Protein.Names, Samples, Replicate) |>
+  summarise(protein_intensity = mean(peptide_intensities)) |>
+  mutate(percent_abundance = protein_intensity / sum(protein_intensity))
+
+# Calculate the percent of the total protein abundance
+
+# ((intensity of individual protein / sum of all protein intensities in a given sample) * 100)
 
 
 # ----- TODO? ---------------
