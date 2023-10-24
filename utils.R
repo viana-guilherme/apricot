@@ -282,11 +282,9 @@ diann_pca_view <- function(pca_res) {
 # top 3 method
 
 # step 1) Filter the DIA-NN peptide report data (from import) to only proteins that have three or more peptides identified across all samples
-
 # obs: the way we have the data better organized, we can it easily by using the "db" obj
 # as returned by the diann_import function
 
-# (i'm still not sure if this is the best option, but it looks elegant for now)
 find_eligible <- function(diann_database) {
 
   eligible_ptn <- diann_database |>
@@ -297,6 +295,7 @@ find_eligible <- function(diann_database) {
 
     return(eligible_ptn)
 
+# (i'm still not sure if this is the best option, but it looks elegant for now)
 }
 
 # step 2) For each protein, rank the top 3 peptides by intensity (counts) in each of the samples
@@ -307,40 +306,98 @@ find_top3 <- function(diann_database, eligible) {
   top3 <- diann_database |>
     dplyr::filter(Protein.Names %in% eligible_list) |>
     dplyr::group_by(Protein.Names, Samples, Replicate) |>
-    #dplyr::mutate(rank = rank(peptide_intensities, na.last = FALSE)) |> this is actually not doing anything
+    dplyr::mutate(rank = rank(peptide_intensities, na.last = FALSE)) |>
     dplyr::slice_max(n = 3, order_by = peptide_intensities)
 
   return(top3)
 }
 
+# Calculate protein intensity (counts) of all proteins in samples by averaging the peptide intensities
+all_intensities <- function(diann_database) {
 
-# Calculate the mean rankings of the peptides in each protein across all samples
-# obs: i follow this step, but it does not seem to be used elsewhere as of yet)
-top3_mean_ranks <- top3 |>
-  ungroup() |>
-  group_by(Protein.Names, Precursor.Id) |>
-  summarise(mean_rank = mean(rank)) |>
-  # Filter the data to the three highest ranked peptides in each protein
-  slice_max(n = 3, order_by = mean_rank)
+  diann_database <- dplyr::group_by(Protein.Names, Samples, Replicate) |>
+                    dplyr::summarise(protein_intensity = mean(peptide_intensities), .groups = "drop") |>
 
+                    # Calculate percent abundance:
+                    # ((intensity of individual protein / sum of all protein intensities in a given sample) * 100)
+                    dplyr::mutate(percent_abundance = protein_intensity / sum(protein_intensity))
 
-# Calculate protein intensity (counts) by averaging the intensity (counts) of the Top3 peptides
+}
 
-all_intensities <- db |>
-  dplyr::group_by(Protein.Names, Samples, Replicate) |>
-  dplyr::summarise(value_sum = mean(peptide_intensities), .groups = "drop")
+# Calculate protein intensity  of the Top3 peptides by averaging the intensity (counts)
+top3_intensities <- function(diann_database, eligible) {
 
-top3_intensities <- db |>
-  filter(Precursor.Id %in% top3_mean_ranks$Precursor.Id) |>
-  group_by(Protein.Names, Samples, Replicate) |>
-  summarise(protein_intensity = mean(peptide_intensities)) |>
-  mutate(percent_abundance = protein_intensity / sum(protein_intensity))
+  top3_mean_ranks <- find_top3(diann_database, eligible) |>
+    dplyr::ungroup() |>
+    dplyr::group_by(Protein.Names, Precursor.Id) |>
+    dplyr::summarise(mean_rank = mean(rank)) |>
 
-# Calculate the percent of the total protein abundance
+    # Filter the data to the three highest ranked peptides in each protein
+    dplyr::slice_max(n = 3, order_by = mean_rank)
 
-# ((intensity of individual protein / sum of all protein intensities in a given sample) * 100)
+    # Calculate the percent of the total protein abundance
+    diann_database |>
+      dplyr::filter(Precursor.Id %in% top3_mean_ranks$Precursor.Id) |>
+      dplyr::group_by(Protein.Names, Samples, Replicate) |>
+      dplyr::summarise(protein_intensity = mean(peptide_intensities))
+}
 
+# make nice qc plots
 
+diann_qc_counts <- function(diann_database, top3_database, output.nrow = 7) {
+
+  # The idea of this function is to quickly generate a barplot with vital information
+  # about the quality of the samples
+
+  # 1) retrieve info on the total amount of proteins found across samples
+  total_ptn <- diann_database |> dplyr::pull(Protein.Names) |> unique() |> length()
+
+  # 2) retrieve information on the total amount of peptides in each sample
+  peptides_per_sample <- diann_database |>
+    dplyr::filter(peptide_intensities != 0) |>
+    dplyr::group_by(Samples, Replicate) |>
+    dplyr::summarise(ptn_count = length(unique(Protein.Ids))) |>
+    dplyr::mutate(unique_name = glue::glue("{Samples}_{Replicate}"), total = total_ptn)
+
+  # 3) retrieve information on the top3 peptides in each sample
+  peptides_per_sample_top3 <- top3_database |>
+    dplyr::filter(protein_intensity != 0) |>
+    dplyr::group_by(Samples, Replicate) |>
+    dplyr::summarise(ptn_count = length(unique(Protein.Names))) |>
+    dplyr::mutate(unique_name = glue::glue("{Samples}_{Replicate}"),
+           total = total_ptn)
+
+  # plot the information
+  ggplot2::ggplot(peptides_per_sample,
+                  ggplot2::aes(x = ptn_count, y = forcats::fct_rev(Replicate))) +
+
+    # add bars
+    ggplot2::geom_bar(ggplot2::aes(x = total, fill = "lightblue"),
+                      stat = "identity", position = "dodge", width = 0.9) +
+
+    ggplot2::geom_bar(ggplot2::aes(fill = "goldenrod2"),
+                      stat = "identity", position = "dodge", width = 0.9) +
+
+    ggplot2::geom_bar(data = peptides_per_sample_top3,
+                      ggplot2::aes(x = ptn_count, y = fct_rev(Replicate), fill = "darkseagreen"),
+                      stat = "identity", position = "dodge", width = 0.9) +
+
+    # add the annotations
+    ggplot2::geom_text(aes( x = ptn_count + 90, label = ptn_count), color = "darkgoldenrod4") +
+    ggplot2::geom_text(aes( x = total - 100, label = total), color = "steelblue") +
+    ggplot2::geom_text(data = peptides_per_sample_top3, aes( x = 100, label = ptn_count), color = "darkgreen") +
+
+    # cosmetic adjustments
+    ggplot2::facet_wrap(~Samples, nrow = output.nrow) +
+    ggplot2::scale_fill_identity(guide = "legend",
+                                 name = "Number of proteins",
+                                 breaks = c("lightblue","goldenrod2", "darkseagreen"),
+                                 labels = c("Total in dataset", "Total in sample", "Top3 method")) +
+    ggplot2::guides(color = "none") +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(x = "Counts", y = "") +
+    ggplot2::theme_minimal(base_size = 14)
+}
 # ----- TODO? ---------------
 # File sanitation
 
