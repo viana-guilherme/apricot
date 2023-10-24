@@ -1,8 +1,8 @@
 # reference:
 # https://www.protocols.io/view/label-free-quantification-lfq-proteomic-data-analy-5qpvobk7xl4o/v2
 
-# ------ T-tests ---------
-import_diann <- function(file_path) {
+#------- Imports and data handling --------
+diann_import <- function(file_path) {
   # Importing the report file
   raw_data <- readr::read_csv(file = file_path)
   db <- raw_data |>
@@ -19,31 +19,55 @@ import_diann <- function(file_path) {
     # changes NAs to 0
     dplyr::mutate(peptide_intensities = tidyr::replace_na(peptide_intensities, 0))
 
-    # need to separate this step from the workflow (because of top3 method)
-    # sum peptide intensities to make protein intensities
-    dplyr::group_by(Protein.Names, Samples, Replicate) |>
-    dplyr::summarise(value_sum = sum(peptide_intensities), .groups = "drop")
-
-  # generating the summarised version of the db with some main statistics
-  db_summary <- db |>
-    dplyr::group_by(Protein.Group, Protein.Ids, Protein.Names, Genes, Samples) |>
-    dplyr::summarise(Counts_mean = mean(value_sum),
-                     Counts_std = sd(value_sum),
-                     `%CV` = Counts_std / Counts_mean * 100,
-                     .groups = "drop")
 
   return(db)
 
   # note on the use of Protein.Names to group samples:
   # It seems to be the least ambiguous information we have available. Sometimes, Protein
-  # I've noticed on a dataset that Protein.Ids could be ""Q88FA7", and  "Q88FA7;CP0001", even though names and group are uniquely identified as ""Q88FA7" "Q88FA7",
+  # I've noticed on a dataset that Protein.Ids could be ""Q88FA7", and  "Q88FA7;CP0001", even though names and group are uniquely identified as ""Q88FA7" "Q88FA7", and proteotypic != 0
 }
+
+diann_collapse <- function(database) {
+
+  # this is needed as a separate function to allow the top3 method to integrate in our workflow
+
+  # sum peptide intensities to make protein intensities
+  db_collapse <- database |>
+                  dplyr::group_by(Protein.Names, Samples, Replicate) |>
+                  dplyr::summarise(value_sum = sum(peptide_intensities), .groups = "drop")
+
+  return(db_collapse)
+
+}
+
+diann_summary <- function(database) {
+
+  # checks if the data was already processed. If not, do it
+  if (!"value_sum" %in% names(database)) {
+    database <- diann_collapse(database)
+  }
+
+  # generating the summarised version of the db with some main statistics
+  db_summary <- database |>
+    dplyr::group_by(Protein.Names, Samples) |>
+    dplyr::summarise(Counts_mean = mean(value_sum),
+                     Counts_std = sd(value_sum),
+                     `%CV` = Counts_std / Counts_mean * 100,
+                     .groups = "drop")
+
+  return(db_summary)
+
+}
+
 find_lod <- function(x) {
   input_sorted <- base::sort(base::unique(x))
   lod <- ifelse(input_sorted[1] == 0, input_sorted[2], input_sorted[1])
 
   return(lod)
 }
+
+# ------ T-tests ---------
+
 format_ttest <- function(data, group1, group2) {
 
   # change data so that the levels order match the user preference
